@@ -29,8 +29,12 @@ _If you got any trouble, just send me an email boquete37@gmail.com_
 	pip install -r requirements.txt
 	python crawler.py
 
-## Usage
+### MacOS
 
+https://note.redgoose.me/article/2036
+
+
+## Usage
 
 If there is a string containing "artsandculture.google.com" in your clipboard the script will attempt to run it as the input url and use the default image size, otherwise you will be asked for:
 * url - url of image, for example: <https://artsandculture.google.com/asset/madame-moitessier/hQFUe-elM1npbw>

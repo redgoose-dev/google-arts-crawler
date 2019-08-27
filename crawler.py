@@ -1,3 +1,4 @@
+import sys
 import time
 import base64
 import re
@@ -13,7 +14,8 @@ from PIL import Image
 from slugify import slugify
 
 DEFAULT_SIZE = 12000
-DEFAULT_HOST = 'artsandculture.google.com'
+DEFAULT_HOST = 'https://artsandculture.google.com'
+DEFAULT_DOWNLOAD_DELAY = 0.04
 
 @click.command()
 @click.option(
@@ -30,13 +32,18 @@ DEFAULT_HOST = 'artsandculture.google.com'
     is_flag=True,
     help="Raise errors instead of just printing them. Useful for debugging."
 )
+
 def main(url, size, raise_errors):
     try:
         cleanup()
         url = pyperclip.paste()
-        if not DEFAULT_HOST in url:
-            url, size = get_user_input()
-        print("> Opening website")
+        rex = re.compile('^'+DEFAULT_HOST).match(url)
+        if rex:
+            pasteUrl = url
+        else:
+            pasteUrl = ''
+        url, size = get_user_input(pasteUrl, size)
+        print('> Opening website')
         generate_image(url, size, raise_errors)
         cleanup()
     except Exception as e:
@@ -46,13 +53,23 @@ def main(url, size, raise_errors):
         print(e)
 
 
-def get_user_input():
+def get_user_input(getUrl, getSize=DEFAULT_SIZE):
     print("=====================================")
     print("=== Google Arts & Culture crawler ===")
     print("=====================================")
     print("Provide image URL")
-    print("sample url: https://artsandculture.google.com/asset/madame-moitessier/hQFUe-elM1npbw")
+    if getUrl:
+        print('paste url:', getUrl)
+    else:
+        print("sample url: https://artsandculture.google.com/asset/madame-moitessier/hQFUe-elM1npbw")
     url = input('> URL: ')
+    if not url:
+        url = getUrl
+    rex = re.compile('^'+DEFAULT_HOST).match(url)
+    if not rex:
+        print('Not found url')
+        sys.exit(1)
+
     print("=====================================")
     print("Provide image maximum SIZE")
     print("sample size: 12000 (recommended)")
@@ -60,7 +77,7 @@ def get_user_input():
     if size:
         size = int(size)
     else:
-        size = DEFAULT_SIZE
+        size = getSize
     print("=====================================")
     return url, size
 
@@ -77,7 +94,7 @@ def generate_image(url, size, raise_errors, delay=5):
     browser.get(url)
     time.sleep(delay)
     blobs = browser.find_elements_by_tag_name('img')
-    print("> Downloading partial images..")
+    print("> Downloading partial images, total:", len(blobs))
     os.mkdir('blobs')
 
     title = slugify(browser.title)
@@ -106,6 +123,8 @@ def generate_image(url, size, raise_errors, delay=5):
             # Save blob to file
             image = (get_file_content_chrome(browser, blob.get_attribute('src')))
             filename = 'blobs/{0}.jpg'.format(i)
+            # print(i, ':', blob)
+            print(i, ':', filename, '--', positions)
 
             with open(filename, 'wb') as f:
                 f.write(image)
@@ -119,9 +138,16 @@ def generate_image(url, size, raise_errors, delay=5):
                 if raise_errors:
                     raise e
                 print(str(e))
-                print('Trying again...')
-                generate_image(url, size, raise_errors, delay+10)
+                restart = input('> Restart download(Y/n) : ')
+                if restart == 'n':
+                    cleanup()
+                    sys.exit(1)
+                else:
+                    print('Trying again...')
+                    cleanup()
+                    generate_image(url, size, raise_errors, delay+5)
 
+        time.sleep(DEFAULT_DOWNLOAD_DELAY)
         i += 1
 
     print("> Downloaded {0} partial images".format(len(blobs)))
